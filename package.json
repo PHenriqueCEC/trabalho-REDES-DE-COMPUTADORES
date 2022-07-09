@@ -1,0 +1,16 @@
+{
+  "name": "trabalho-REDES-DE-COMPUTADORES",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/PHenriqueCEC/trabalho-REDES-DE-COMPUTADORES.git",
+  "author": "Matheus <werneckmatheus12@gmail.com>",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon src/index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.1",
+    "nodemon": "^2.0.19"
+  }
+}
