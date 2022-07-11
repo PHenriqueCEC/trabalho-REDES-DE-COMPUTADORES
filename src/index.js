@@ -1,10 +1,12 @@
+import dgram from "dgram";
+import fs from "fs";
+import { Buffer } from "node:buffer";
 import "dotenv/config";
 import "./server.js";
 
-import dgram from "dgram";
+const client = dgram.createSocket("udp4");
 
-var client = dgram.createSocket("udp4");
-
-// const serverUrl = `localhost:${process.env.PORT}`;
+const image = fs.readFileSync("src/download.png");
 
 client.send("Hello world UDP", process.env.PORT);
+client.send(image, process.env.PORT);
