@@ -1,12 +1,14 @@
-import dgram from "dgram";
+import "dotenv/config";
 import fs from "fs";
 import { Buffer } from "node:buffer";
-import "dotenv/config";
-import "./server.js";
+import { SafeUdpServer } from "./SafeUdpServer.js";
+import { SafeUdpReceiver } from "./SafeUdpReceiver.js";
 
-const client = dgram.createSocket("udp4");
+const { SIZE_OF_BUFFER, PORT } = process.env;
 
-const image = fs.readFileSync("src/download.png");
+const server = new SafeUdpServer({ bufferSize: SIZE_OF_BUFFER, port: PORT });
+const client = new SafeUdpReceiver({ serverUrl: "localhost" });
 
-client.send("Hello world UDP", process.env.PORT);
-client.send(image, process.env.PORT);
+const buff = Buffer.alloc(1024, "banana");
+
+client.send({ data: buff, serverUrl: PORT });
