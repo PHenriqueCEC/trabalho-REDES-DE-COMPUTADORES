@@ -1,5 +1,6 @@
 import dgram from "node:dgram";
 import { Buffer } from "node:buffer";
+import logger from "./utils/logger.js";
 
 export class SafeUdpServer {
   constructor({ bufferSize, port }) {
@@ -21,9 +22,11 @@ export class SafeUdpServer {
 
     this.server.on("listening", () => {
       const address = this.server.address();
-      console.log(`server listening ${address.address}:${address.port}`);
+      logger.info(`server listening ${address.address}:${address.port}`);
     });
   }
 
   sendFile(file, clientUrl) {}
+
+  sendPackage() {}
 }
