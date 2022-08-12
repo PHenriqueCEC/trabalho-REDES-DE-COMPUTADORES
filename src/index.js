@@ -15,6 +15,6 @@ const client = new SafeUdpReceiver({
 
 // client.send({ data: buff, serverUrl: PORT });
 
-const image = fs.readFileSync("src/images/download.png");
+const image = fs.readFileSync("src/images/image2.jpg");
 
 server.sendFile(image, CLIENT_PORT);

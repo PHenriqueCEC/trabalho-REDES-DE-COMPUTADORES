@@ -48,27 +48,35 @@ export class SafeUdpServer {
       this.confirmedPackages[numberOfSequence] = true;
       clearTimeout(this.timeouts[numberOfSequence]);
 
-      if (numberOfSequence === this.baseSeqNum) {
-        this.baseSeqNum++;
-        logger.info(`Base ${this.baseSeqNum}`);
+      if (numberOfSequence === this.baseSeqNum) this.baseSeqNum++;
+      else if (this.currentWindowIsConfirmed())
+        this.baseSeqNum += this.windowSize;
 
-        if (this.baseSeqNum === this.fileChunks.length)
-          for (
-            let i = this.baseSeqNum;
-            i < this.baseSeqNum + this.windowSize && i < this.fileChunks.length;
-            i++
-          ) {
-            if (!this.sentPackages[i]) {
-              const packageToSend = Buffer.alloc(1024);
+      logger.info(`Base ${this.baseSeqNum}`);
 
-              this.makeHeader(packageToSend, i);
-              packageToSend.fill(this.fileChunks[i], this.headerSize);
+      for (
+        let i = this.baseSeqNum;
+        i < this.baseSeqNum + this.windowSize && i < this.fileChunks.length;
+        i++
+      ) {
+        if (!this.sentPackages[i]) {
+          const packageToSend = Buffer.alloc(1024);
 
-              this.sendPackage(packageToSend, this.clientUrl, i);
-            }
-          }
+          this.makeHeader(packageToSend, i);
+          packageToSend.fill(this.fileChunks[i], this.headerSize);
+
+          this.sendPackage(packageToSend, this.clientUrl, i);
+        }
       }
     });
+  }
+
+  currentWindowIsConfirmed() {
+    for (let i = this.baseSeqNum; i < this.baseSeqNum + this.windowSize; i++) {
+      if (!this.confirmedPackages[i]) return false;
+    }
+
+    return true;
   }
 
   onError() {
@@ -114,6 +122,20 @@ export class SafeUdpServer {
     buffer[8] = isLastPackage;
   }
 
+  generatePackageTimeout(packageData, clientUrl, numberOfSequence) {
+    const timeout = setTimeout(() => {
+      if (!this.confirmedPackages[numberOfSequence]) {
+        logger.warn(`Package ${numberOfSequence} got timeout`);
+
+        this.sendPackage(packageData, clientUrl);
+      }
+    }, 150);
+
+    this.timeouts[numberOfSequence] = timeout;
+
+    return timeout;
+  }
+
   sendPackage(packageData, clientUrl) {
     const numberOfSequence = packageData.readUInt32BE();
 
@@ -122,14 +144,6 @@ export class SafeUdpServer {
 
     logger.info(`${numberOfSequence} enviado`);
 
-    const timeout = setTimeout(() => {
-      if (!this.confirmedPackages[numberOfSequence]) {
-        logger.warn(`Package ${numberOfSequence} got timeout`);
-
-        this.server.send(packageData, clientUrl);
-      }
-    }, 1000);
-
-    this.timeouts[numberOfSequence] = timeout;
+    this.generatePackageTimeout(packageData, clientUrl, numberOfSequence);
   }
 }
