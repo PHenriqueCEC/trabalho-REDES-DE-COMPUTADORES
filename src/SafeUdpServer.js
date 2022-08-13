@@ -23,6 +23,12 @@ export class SafeUdpServer {
     this.baseSeqNum = 0;
     this.lastRecevSeqNum = 0;
 
+    this.sampleRTT = 200;
+    this.estimatedRTT = 0;
+    this.devRTT = 0;
+
+    this.startRTT = [];
+
     this.initServer();
   }
 
@@ -32,6 +38,20 @@ export class SafeUdpServer {
 
     this.onError();
     this.onMessage();
+    this.onListening();
+  }
+
+  calcTimeout() {
+    const alfa = 0.125;
+    const beta = 0.25;
+
+    this.estimatedRTT = (1 - alfa) * this.estimatedRTT + alfa * this.sampleRTT;
+
+    this.devRTT =
+      (1 - beta) * this.devRTT +
+      beta * Math.abs(this.sampleRTT - this.estimatedRTT);
+
+    return this.estimatedRTT + 4 * this.devRTT;
   }
 
   onListening() {
@@ -69,10 +89,72 @@ export class SafeUdpServer {
     this.sendDataPackage(data, this.clientUrl);
   }
 
+  // handleDataPackage(msg = new Buffer()) {
+  //   const numberOfSequence = msg.readUint32BE(1);
+
+  //   logger.info(`Package ${numberOfSequence} received`);
+
+  //   this.confirmedPackages[numberOfSequence] = true;
+  //   clearTimeout(this.timeouts[numberOfSequence]);
+
+  //   if (numberOfSequence === this.baseSeqNum) this.baseSeqNum++;
+  //   else if (this.currentWindowIsConfirmed())
+  //     this.baseSeqNum += this.windowSize;
+
+  //   logger.info(`Base ${this.baseSeqNum}`);
+
+  //   for (
+  //     let i = this.baseSeqNum;
+  //     i < this.baseSeqNum + this.windowSize && i < this.fileChunks.length;
+  //     i++
+  //   ) {
+  //     if (!this.sentPackages[i]) {
+  //       const packageToSend = this.makeDataPackage(i);
+  //       this.sendDataPackage(packageToSend, this.clientUrl, i);
+  //     }
+  //   }
+  // }
+
+  makeDataPackage(numberOfSequence) {
+    const data = Buffer.alloc(1024);
+
+    this.makeHeader(data, numberOfSequence);
+    data.fill(
+      this.fileChunks[numberOfSequence],
+      100,
+      this.fileChunks[numberOfSequence].length + 100
+    );
+
+    return data;
+  }
+
+  getPackageType(data = new Buffer()) {
+    const packageType = data.readInt8();
+
+    return packageType === 1 ? "connection" : "data";
+  }
+
+  handleConnectionPackage(msg = new Buffer()) {
+    const initialPackageSeqNum = msg.readUInt32BE(1);
+    this.windowSize = msg.readUint32BE(5);
+
+    logger.info(
+      `Initial seq num ${initialPackageSeqNum}, initial Window Size ${this.windowSize}`
+    );
+
+    const data = this.makeDataPackage(initialPackageSeqNum);
+
+    this.sendDataPackage(data, this.clientUrl);
+  }
+
   handleDataPackage(msg = new Buffer()) {
     const numberOfSequence = msg.readUint32BE(1);
 
     logger.info(`Package ${numberOfSequence} received`);
+
+    if (this.startRTT[numberOfSequence]) {
+      this.sampleRTT = new Date().getTime() - this.startRTT[numberOfSequence];
+    }
 
     this.confirmedPackages[numberOfSequence] = true;
     clearTimeout(this.timeouts[numberOfSequence]);
@@ -150,6 +232,7 @@ export class SafeUdpServer {
   }
 
   generatePackageTimeout(packageData, clientUrl, numberOfSequence) {
+    const time = this.calcTimeout();
     const timeout = setTimeout(() => {
       if (!this.confirmedPackages[numberOfSequence]) {
         logger.warn(`Package ${numberOfSequence} got timeout`);
@@ -157,7 +240,7 @@ export class SafeUdpServer {
         this.lostPackages++;
         this.sendDataPackage(packageData, clientUrl);
       }
-    }, 150);
+    }, time);
 
     this.timeouts[numberOfSequence] = timeout;
   }
@@ -178,6 +261,8 @@ export class SafeUdpServer {
 
   sendDataPackage(packageData, clientUrl) {
     const numberOfSequence = packageData.readUInt32BE(1);
+
+    this.startRTT[numberOfSequence] = new Date().getTime();
 
     this.server.send(packageData, clientUrl);
     this.generatePackageTimeout(packageData, clientUrl, numberOfSequence);
