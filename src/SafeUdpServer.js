@@ -13,6 +13,7 @@ export class SafeUdpServer {
     this.headerSize = 100;
     this.bufferSize = bufferSize;
     this.timeouts = [];
+    this.lostPackages = 0;
 
     //Janela deslizante
     this.confirmedPackages = [];
@@ -118,14 +119,18 @@ export class SafeUdpServer {
     // Byte 0 a 7 numero de sequencia
     // Byte 8 guarda se é ultimo pacote
 
-    buffer.writeUint32BE(numberOfSequence);
+    const buff = Buffer.alloc();
+
+    buffer.writeBigInt64BE(numberOfSequence);
     buffer[8] = isLastPackage;
+    buffer.writeUint32BE();
   }
 
   generatePackageTimeout(packageData, clientUrl, numberOfSequence) {
     const timeout = setTimeout(() => {
       if (!this.confirmedPackages[numberOfSequence]) {
         logger.warn(`Package ${numberOfSequence} got timeout`);
+        this.lostPackages++;
 
         this.sendPackage(packageData, clientUrl);
       }
@@ -137,13 +142,13 @@ export class SafeUdpServer {
   }
 
   sendPackage(packageData, clientUrl) {
-    const numberOfSequence = packageData.readUInt32BE();
+    const numberOfSequence = packageData.readBigInt64BE();
 
     this.server.send(packageData, clientUrl);
+    this.generatePackageTimeout(packageData, clientUrl, numberOfSequence);
+
     this.sentPackages[numberOfSequence] = true;
 
     logger.info(`${numberOfSequence} enviado`);
-
-    this.generatePackageTimeout(packageData, clientUrl, numberOfSequence);
   }
 }

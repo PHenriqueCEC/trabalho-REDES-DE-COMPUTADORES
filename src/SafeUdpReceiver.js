@@ -17,9 +17,7 @@ export class SafeUdpReceiver {
   }
 
   acceptPackage() {
-    const generateNumber = parseInt(Math.random() * 1000);
-
-    return generateNumber % 2 === 0;
+    return parseInt(Math.random() * 10) > 2;
   }
 
   initServer() {
@@ -29,8 +27,10 @@ export class SafeUdpReceiver {
     this.server.on("error", (err) => {});
 
     this.server.on("message", (msg, rinfo) => {
-      this.receivedSeqNum = msg.readUInt32BE(0);
+      this.receivedSeqNum = msg.readBigInt64BE(0);
       const isLastPackage = msg[8];
+
+      const data = msg.subarray(100);
 
       //Usa uma função randomica para simular perda de pacotes
       if (this.acceptPackage())

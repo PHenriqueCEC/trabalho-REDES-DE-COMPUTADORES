@@ -1,6 +1,5 @@
 import "dotenv/config";
 import fs from "fs";
-import { Buffer } from "node:buffer";
 import { SafeUdpServer } from "./SafeUdpServer.js";
 import { SafeUdpReceiver } from "./SafeUdpReceiver.js";
 import path from "path";
