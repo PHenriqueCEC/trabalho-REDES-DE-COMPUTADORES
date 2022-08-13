@@ -17,48 +17,77 @@ export class SafeUdpReceiver {
   }
 
   acceptPackage() {
-    return true;
     return parseInt(Math.random() * 10) > 2;
+  }
+
+  /*@todo: remontar o arquivo */
+  /*@todo: controle de fluxo*/
+
+  getPackageType(data = new Buffer()) {
+    const packageType = data.readInt8();
+
+    return packageType === 1 ? "connection" : "data";
   }
 
   initServer() {
     this.server = dgram.createSocket("udp4");
     this.server.bind(this.port);
 
-    this.server.on("error", (err) => {
-      console.log(err);
-    });
+    this.initOnListening();
+    this.initOnMessage();
 
-    this.server.on("message", (msg, rinfo) => {
-      this.receivedSeqNum = msg.readUInt32BE(0);
-      const isLastPackage = msg[8];
+    this.server.on("error", (err) => {});
+  }
 
-      const data = msg.subarray(100);
+  initOnMessage() {
+    this.server.on("message", (msg) => {
+      const packageType = this.getPackageType(msg);
 
-      //Usa uma função randomica para simular perda de pacotes
-      if (this.acceptPackage()) {
-        const packageToSend = Buffer.alloc(1024);
-
-        packageToSend.fill(String(this.receivedSeqNum));
-
-        this.send({
-          data: packageToSend,
-          serverPort: this.serverPort,
-        });
+      if (packageType === "connection") this.handleConnectionPackage(msg);
+      else {
+        this.handleDataPackage(msg);
       }
 
       console.log(`Server got a message with legnth of: ${msg.length}`);
     });
+  }
 
+  initOnListening() {
     this.server.on("listening", () => {
       const address = this.server.address();
       logger.info(`server listening ${address.address}:${address.port}`);
     });
   }
 
-  makeHeader() {}
+  handleConnectionPackage(msg = new Buffer()) {
+    this.numberOfPackages = msg.readUInt32BE(1);
+    const initialPackageSeqNum = msg.readInt32BE(5);
 
-  send({ data, serverPort }) {
-    this.server.send(data, serverPort);
+    const initialWindowSize = 10;
+
+    const data = Buffer.alloc(9);
+
+    //Escreve tipo de pacote
+    data.writeInt8(1);
+    data.writeInt32BE(initialPackageSeqNum, 1);
+    data.writeUInt32BE(initialWindowSize, 5);
+
+    this.server.send(data, this.serverPort);
   }
+
+  handleDataPackage(msg) {
+    this.receivedSeqNum = msg.readUInt32BE(1);
+
+    const data = msg.subarray(100);
+
+    const packageToSend = Buffer.alloc(5);
+
+    packageToSend.writeUInt8(2);
+    packageToSend.writeUint32BE(this.receivedSeqNum, 1);
+
+    //Usa uma função randomica para simular perda de pacotes
+    if (this.acceptPackage()) this.server.send(packageToSend, this.serverPort);
+  }
+
+  makeHeader() {}
 }
