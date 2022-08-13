@@ -9,6 +9,7 @@ export class SafeUdpServer {
     this.port = port;
     this.numberOfSequence = 0;
     this.fileChunks = [];
+    this.availableBufferSpace = //Espaço disnponivel no Buffer no sistema de recebimento
 
     this.headerSize = 100;
     this.bufferSize = bufferSize;
@@ -29,7 +30,6 @@ export class SafeUdpServer {
 
     this.startRTT = [];
 
-    this.initServer();
   }
 
   initServer() {
@@ -39,6 +39,7 @@ export class SafeUdpServer {
     this.onError();
     this.onMessage();
     this.onListening();
+    this.onControlFlow();
   }
 
   calcTimeout() {
@@ -201,6 +202,7 @@ export class SafeUdpServer {
   onError() {
     this.server.on("error", (err) => {});
   }
+
 
   sendFile(file, clientUrl) {
     this.clientUrl = clientUrl;

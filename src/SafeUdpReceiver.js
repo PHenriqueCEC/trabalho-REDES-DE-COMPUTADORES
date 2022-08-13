@@ -5,14 +5,26 @@ import logger from "./utils/logger.js";
 const serverUrl = "127.0.0.1";
 
 export class SafeUdpReceiver {
-  constructor({ serverUrl, port, serverPort }) {
+  constructor({ bufferSize, serverUrl, port, serverPort }) {
+    this.buffer = Buffer.alloc(parseInt(bufferSize)); //Tamanho do recebimento no espaço
     this.server = dgram.createSocket("udp4");
     this.serverUrl = serverUrl;
     this.lastNumberOfSequence = 0;
     this.port = port;
     this.serverPort = serverPort;
     this.file = null;
+    this.availableBufferSpace = //Espaço disnponivel no Buffer no sistema de recebimento
 
+
+    this.bufferSize = bufferSize;
+
+    //Fluxo de controle
+    this.receiverWindow = bufferSize; //valor da janela inicializado com o tamanho do buffer
+    this.dataInBuffer = 0; //Tamanho de dados no buffer. Inicializa com 0 pois o buffer esta vazio
+    this.receiverBuffer = this.receiverWindow + this.dataInBuffer; //Tamanho total do buffer de recepcao
+
+    //Precisa de 2 initServer?
+    this.initServer();
     this.initServer();
   }
 
@@ -21,7 +33,17 @@ export class SafeUdpReceiver {
   }
 
   /*@todo: remontar o arquivo */
+  
   /*@todo: controle de fluxo*/
+  initControlFlow() {
+    if(this.receiverBuffer > (this.receiverWindow + this.dataInBuffer))
+    {
+      console.log("Buffer de recepção cheio. Fazer alguma coisa")
+    }
+
+
+  }
+
 
   getPackageType(data = new Buffer()) {
     const packageType = data.readInt8();
@@ -35,6 +57,7 @@ export class SafeUdpReceiver {
 
     this.initOnListening();
     this.initOnMessage();
+    this.initControlFlow(); //Inicializa fluxo de controle
 
     this.server.on("error", (err) => {});
   }
