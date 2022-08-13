@@ -46,6 +46,7 @@ export class SafeUdpServer {
       const numberOfSequence = parseInt(msg);
 
       logger.info(`Package ${numberOfSequence} received`);
+
       this.confirmedPackages[numberOfSequence] = true;
       clearTimeout(this.timeouts[numberOfSequence]);
 
@@ -92,18 +93,19 @@ export class SafeUdpServer {
     );
     this.baseSeqNum = 0;
 
+    this.handshake(this.fileChunks.length);
     this.initControlsArrays(this.fileChunks.length);
 
-    for (let i = 0; i < this.windowSize && i < this.fileChunks.length; i++) {
-      const packageToSend = Buffer.alloc(1024);
+    // for (let i = 0; i < this.windowSize && i < this.fileChunks.length; i++) {
+    //   const packageToSend = Buffer.alloc(1024);
 
-      const isLastPackage = this.fileChunks.length === i;
+    //   const isLastPackage = this.fileChunks.length === i;
 
-      this.makeHeader(packageToSend, i, isLastPackage);
-      packageToSend.fill(this.fileChunks[i], this.headerSize);
+    //   this.makeHeader(packageToSend, i, isLastPackage);
+    //   packageToSend.fill(this.fileChunks[i], this.headerSize);
 
-      this.sendPackage(packageToSend, clientUrl);
-    }
+    //   this.sendPackage(packageToSend, clientUrl);
+    // }
   }
 
   initControlsArrays(packagesToSendLenght) {
@@ -130,15 +132,22 @@ export class SafeUdpServer {
     const timeout = setTimeout(() => {
       if (!this.confirmedPackages[numberOfSequence]) {
         logger.warn(`Package ${numberOfSequence} got timeout`);
-        this.lostPackages++;
 
+        this.lostPackages++;
         this.sendPackage(packageData, clientUrl);
       }
     }, 150);
 
     this.timeouts[numberOfSequence] = timeout;
+  }
 
-    return timeout;
+  handshake(totalNumberoOfPackages) {
+    const data = Buffer.alloc(100);
+
+    //Tam da janela nos bytes 0 a 3
+    //Numero de pacotes a ser enviado nos bytes 4 a 7
+
+    data.writeInt32BE(totalNumberoOfPackages);
   }
 
   sendPackage(packageData, clientUrl) {
