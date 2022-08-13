@@ -28,7 +28,7 @@ export class SafeUdpServer {
 
   initServer() {
     this.server = dgram.createSocket("udp4");
-    this.server.bind(process.env.port);
+    this.server.bind(this.port);
 
     this.onError();
     this.onMessage();
