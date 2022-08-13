@@ -23,6 +23,12 @@ export class SafeUdpServer {
     this.baseSeqNum = 0;
     this.lastRecevSeqNum = 0;
 
+    this.sampleRTT = 200;
+    this.estimatedRTT = 0;
+    this.devRTT = 0;
+
+    this.startRTT;
+
     this.initServer();
   }
 
@@ -32,6 +38,20 @@ export class SafeUdpServer {
 
     this.onError();
     this.onMessage();
+    this.onListening();
+  }
+
+  calcTimeout() {
+    const alfa = 0.125;
+    const beta = 0.25;
+
+    this.estimatedRTT = (1 - alfa) * this.estimatedRTT + alfa * this.sampleRTT;
+
+    this.devRTT =
+      (1 - beta) * this.devRTT +
+      beta * Math.abs(this.sampleRTT - this.estimatedRTT);
+
+    return this.estimatedRTT + 4 * this.devRTT;
   }
 
   onListening() {
@@ -46,6 +66,11 @@ export class SafeUdpServer {
       const numberOfSequence = parseInt(msg);
 
       logger.info(`Package ${numberOfSequence} received`);
+
+      if (this.startRTT) {
+        this.sampleRTT = new Date().getTime() - this.startRTT;
+      }
+      console.log("RTT: ", this.sampleRTT, " ms ");
 
       this.confirmedPackages[numberOfSequence] = true;
       clearTimeout(this.timeouts[numberOfSequence]);
@@ -126,6 +151,7 @@ export class SafeUdpServer {
   }
 
   generatePackageTimeout(packageData, clientUrl, numberOfSequence) {
+    const time = this.calcTimeout();
     const timeout = setTimeout(() => {
       if (!this.confirmedPackages[numberOfSequence]) {
         logger.warn(`Package ${numberOfSequence} got timeout`);
@@ -133,7 +159,7 @@ export class SafeUdpServer {
         this.lostPackages++;
         this.sendPackage(packageData, clientUrl);
       }
-    }, 150);
+    }, time);
 
     this.timeouts[numberOfSequence] = timeout;
   }
@@ -150,6 +176,7 @@ export class SafeUdpServer {
   sendPackage(packageData, clientUrl) {
     const numberOfSequence = packageData.readUInt32BE();
 
+    this.startRTT = new Date().getTime();
     this.server.send(packageData, clientUrl);
     this.generatePackageTimeout(packageData, clientUrl, numberOfSequence);
 

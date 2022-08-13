@@ -17,6 +17,7 @@ export class SafeUdpReceiver {
   }
 
   acceptPackage() {
+    return true;
     return parseInt(Math.random() * 10) > 2;
   }
 
@@ -24,7 +25,9 @@ export class SafeUdpReceiver {
     this.server = dgram.createSocket("udp4");
     this.server.bind(this.port);
 
-    this.server.on("error", (err) => {});
+    this.server.on("error", (err) => {
+      console.log(err);
+    });
 
     this.server.on("message", (msg, rinfo) => {
       this.receivedSeqNum = msg.readUInt32BE(0);
@@ -33,11 +36,16 @@ export class SafeUdpReceiver {
       const data = msg.subarray(100);
 
       //Usa uma função randomica para simular perda de pacotes
-      if (this.acceptPackage())
+      if (this.acceptPackage()) {
+        const packageToSend = Buffer.alloc(1024);
+
+        packageToSend.fill(String(this.receivedSeqNum));
+
         this.send({
-          data: Buffer(String(this.receivedSeqNum)),
+          data: packageToSend,
           serverPort: this.serverPort,
         });
+      }
 
       console.log(`Server got a message with legnth of: ${msg.length}`);
     });

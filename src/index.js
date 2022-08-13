@@ -5,7 +5,7 @@ import { SafeUdpReceiver } from "./SafeUdpReceiver.js";
 import path from "path";
 import { stringify } from 'csv-stringify';
 
-const { SIZE_OF_BUFFER = 1024, PORT = 2030, CLIENT_PORT = 30 } = process.env;
+const { SIZE_OF_BUFFER = 1024, PORT = 2030, CLIENT_PORT = 3000 } = process.env;
 
 const server = new SafeUdpServer({ bufferSize: SIZE_OF_BUFFER, port: PORT });
 const client = new SafeUdpReceiver({
