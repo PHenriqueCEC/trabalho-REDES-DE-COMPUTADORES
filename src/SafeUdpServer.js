@@ -96,16 +96,16 @@ export class SafeUdpServer {
     this.handshake(this.fileChunks.length);
     this.initControlsArrays(this.fileChunks.length);
 
-    // for (let i = 0; i < this.windowSize && i < this.fileChunks.length; i++) {
-    //   const packageToSend = Buffer.alloc(1024);
+    for (let i = 0; i < this.windowSize && i < this.fileChunks.length; i++) {
+      const packageToSend = Buffer.alloc(1024);
 
-    //   const isLastPackage = this.fileChunks.length === i;
+      const isLastPackage = this.fileChunks.length === i;
 
-    //   this.makeHeader(packageToSend, i, isLastPackage);
-    //   packageToSend.fill(this.fileChunks[i], this.headerSize);
+      this.makeHeader(packageToSend, i, isLastPackage);
+      packageToSend.fill(this.fileChunks[i], this.headerSize);
 
-    //   this.sendPackage(packageToSend, clientUrl);
-    // }
+      this.sendPackage(packageToSend, clientUrl);
+    }
   }
 
   initControlsArrays(packagesToSendLenght) {
@@ -121,11 +121,8 @@ export class SafeUdpServer {
     // Byte 0 a 7 numero de sequencia
     // Byte 8 guarda se é ultimo pacote
 
-    const buff = Buffer.alloc();
-
-    buffer.writeBigInt64BE(numberOfSequence);
+    buffer.writeUInt32BE(numberOfSequence);
     buffer[8] = isLastPackage;
-    buffer.writeUint32BE();
   }
 
   generatePackageTimeout(packageData, clientUrl, numberOfSequence) {
@@ -141,17 +138,17 @@ export class SafeUdpServer {
     this.timeouts[numberOfSequence] = timeout;
   }
 
-  handshake(totalNumberoOfPackages) {
+  handshake(numberOfPackages) {
     const data = Buffer.alloc(100);
 
     //Tam da janela nos bytes 0 a 3
     //Numero de pacotes a ser enviado nos bytes 4 a 7
 
-    data.writeInt32BE(totalNumberoOfPackages);
+    data.writeInt32BE(numberOfPackages);
   }
 
   sendPackage(packageData, clientUrl) {
-    const numberOfSequence = packageData.readBigInt64BE();
+    const numberOfSequence = packageData.readUInt32BE();
 
     this.server.send(packageData, clientUrl);
     this.generatePackageTimeout(packageData, clientUrl, numberOfSequence);

@@ -27,7 +27,7 @@ export class SafeUdpReceiver {
     this.server.on("error", (err) => {});
 
     this.server.on("message", (msg, rinfo) => {
-      this.receivedSeqNum = msg.readBigInt64BE(0);
+      this.receivedSeqNum = msg.readUInt32BE(0);
       const isLastPackage = msg[8];
 
       const data = msg.subarray(100);
