@@ -14,5 +14,7 @@
 4. Caso você deseje gerar os gráficos a partir dos testes feito em sua máquina é necessário
 a instalção do Python, pip e matplot
 
-5. Com o python e pip já instalados:
+5. Com o Python e pip já instalados:
    > `pip install matplot`
+6. Para compilação do código em Python e gerar os gráficos:
+   >`python chart.py`
