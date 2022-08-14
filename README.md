@@ -10,3 +10,9 @@
 
 3. Para rodar o projeto em ambiente de desenvolvimento digite o comando
    > `yarn dev`
+
+4. Caso você deseje gerar os gráficos a partir dos testes feito em sua máquina é necessário
+a instalção do Python, pip e matplot
+
+5. Com o python e pip já instalados:
+   > `pip install matplot`
