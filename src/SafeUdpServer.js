@@ -19,14 +19,15 @@ export class SafeUdpServer {
     //Janela deslizante
     this.confirmedPackages = [];
     this.sentPackages = [];
-
+    this.receivedPackages = 0;
     this.windowSize = 10;
     this.baseSeqNum = 0;
     this.lastRecevSeqNum = 0;
 
-    this.sampleRTT = 200;
+    this.sampleRTT = 50;
     this.estimatedRTT = 0;
     this.devRTT = 0;
+    this.totalRTT = 0;
 
     this.startRTT = [];
 
@@ -55,18 +56,20 @@ export class SafeUdpServer {
       (1 - beta) * this.devRTT +
       beta * Math.abs(this.sampleRTT - this.estimatedRTT);
 
-    return this.estimatedRTT + 4 * this.devRTT;
+    return 4 * (this.estimatedRTT + 4 * this.devRTT);
   }
 
   onListening() {
     this.server.on("listening", () => {
       const address = this.server.address();
-      logger.info(`server listening ${address.address}:${address.port}`);
+      logger.debug(`server listening ${address.address}:${address.port}`);
     });
   }
 
   onMessage() {
     this.server.on("message", (msg, rinfo) => {
+      this.receivedPackages++;
+
       const packageType = this.getPackageType(msg);
 
       if (packageType === "connection") this.handleConnectionPackage(msg);
@@ -93,6 +96,7 @@ export class SafeUdpServer {
     data.writeInt8(PACKAGE_TYPE.disconnection);
 
     this.server.send(data, this.clientUrl);
+    this.server.close();
   }
 
   makeDataPackage(numberOfSequence) {
@@ -118,10 +122,6 @@ export class SafeUdpServer {
     const initialPackageSeqNum = msg.readUInt32BE(1);
     this.windowSize = msg.readUint32BE(5);
 
-    logger.info(
-      `Initial seq num ${initialPackageSeqNum}, initial Window Size ${this.windowSize}`
-    );
-
     const data = this.makeDataPackage(initialPackageSeqNum);
 
     this.sendDataPackage(data, this.clientUrl);
@@ -132,13 +132,18 @@ export class SafeUdpServer {
   handleDataPackage(msg) {
     const numberOfSequence = msg.readUint32BE(1);
 
-    logger.info(`Package ${numberOfSequence} received`);
+    logger.debug(`Package ${numberOfSequence} received`);
 
     if (this.startRTT[numberOfSequence]) {
-      this.sampleRTT = new Date().getTime() - this.startRTT[numberOfSequence];
+      const packageRTT = new Date().getTime() - this.startRTT[numberOfSequence];
+
+      this.totalRTT += packageRTT;
+
+      this.sampleRTT = this.totalRTT / this.receivedPackages;
     }
 
     this.confirmedPackages[numberOfSequence] = true;
+    //this.windowSize++;
     clearTimeout(this.timeouts[numberOfSequence]);
 
     if (numberOfSequence === this.baseSeqNum) this.baseSeqNum++;
@@ -233,7 +238,7 @@ export class SafeUdpServer {
         logger.warn(`Package ${numberOfSequence} got timeout`);
 
         this.lostPackages++;
-        //this.windowSize = this.windowSize / 2;
+        //this.windowSize = Math.round(this.windowSize / 2);
 
         this.sendDataPackage(packageData, clientUrl);
       }
@@ -265,6 +270,6 @@ export class SafeUdpServer {
 
     this.sentPackages[numberOfSequence] = true;
 
-    logger.info(`${numberOfSequence} enviado`);
+    logger.debug(`${numberOfSequence} enviado`);
   }
 }

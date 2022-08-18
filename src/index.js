@@ -14,7 +14,9 @@ new SafeUdpReceiver({
 
 const image = fs.readFileSync("src/images/10MBImage.jpg");
 
-fs.unlinkSync("combined.log");
-fs.unlinkSync("error.log");
+try {
+  fs.unlinkSync("combined.log");
+  fs.unlinkSync("error.log");
+} catch (err) {}
 
 server.sendFile(image, CLIENT_PORT);

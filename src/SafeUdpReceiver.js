@@ -18,7 +18,7 @@ export class SafeUdpReceiver {
   }
 
   acceptPackage() {
-    return parseInt(Math.random() * 10) > 2;
+    return parseInt(Math.random() * 1000) > 2;
   }
 
   /*@todo: controle de fluxo*/
@@ -43,11 +43,9 @@ export class SafeUdpReceiver {
 
   initOnMessage() {
     this.server.on("message", (msg) => {
-      logger.info(`Server got a message with legnth of: ${msg.length}`);
+      logger.debug(`Server got a message with legnth of: ${msg.length}`);
 
       const packageType = this.getPackageType(msg);
-
-      console.log("Package type", packageType);
 
       if (packageType === "connection") this.handleConnectionPackage(msg);
       else if (packageType === "data") this.handleDataPackage(msg);
@@ -59,7 +57,7 @@ export class SafeUdpReceiver {
   initOnListening() {
     this.server.on("listening", () => {
       const address = this.server.address();
-      logger.info(`server listening ${address.address}:${address.port}`);
+      logger.debug(`server listening ${address.address}:${address.port}`);
     });
   }
 
@@ -72,6 +70,7 @@ export class SafeUdpReceiver {
     const initialWindowSize = 10;
 
     const data = Buffer.alloc(9);
+
     //Escreve tipo de pacote
     data.writeInt8(PACKAGE_TYPE.connection);
     data.writeInt32BE(initialPackageSeqNum, 1);
@@ -81,7 +80,11 @@ export class SafeUdpReceiver {
   }
 
   handleDisconectionPackage() {
+    console.log("Disconnection ");
+
     this.remountFile();
+
+    this.server.close();
   }
 
   handleDataPackage(msg) {
