@@ -1,7 +1,14 @@
 import dgram from "dgram";
 import fs from "fs";
 import logger from "./utils/logger.js";
+import path from "path";
 import { PACKAGE_TYPE, PACKAGE_TYPE_DICTIONARY } from "./constants/index.js";
+
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 export class SafeUdpReceiver {
   constructor({ serverUrl, port, serverPort }) {
@@ -18,7 +25,7 @@ export class SafeUdpReceiver {
   }
 
   acceptPackage() {
-    return parseInt(Math.random() * 10) > 2;
+    return parseInt(Math.random() * 1000) > 2;
   }
 
   /*@todo: controle de fluxo*/
@@ -47,8 +54,6 @@ export class SafeUdpReceiver {
 
       const packageType = this.getPackageType(msg);
 
-      console.log("Package type", packageType);
-
       if (packageType === "connection") this.handleConnectionPackage(msg);
       else if (packageType === "data") this.handleDataPackage(msg);
       else if (packageType === "disconnection")
@@ -68,6 +73,7 @@ export class SafeUdpReceiver {
     this.receivedPackages = new Array(this.numberOfPackages);
 
     const initialPackageSeqNum = msg.readInt32BE(5);
+    this.filename = msg.subarray(9).toString();
 
     const initialWindowSize = 10;
 
@@ -81,6 +87,8 @@ export class SafeUdpReceiver {
   }
 
   handleDisconectionPackage() {
+    console.log("Desconectando cliente...");
+
     this.remountFile();
   }
 
@@ -107,6 +115,17 @@ export class SafeUdpReceiver {
   remountFile() {
     const file = Buffer.concat(this.receivedPackages);
 
-    fs.writeFileSync("generated.png", file);
+    try {
+      fs.writeFileSync(
+        path.join(__dirname, "../", "generatedFiles", this.filename),
+        file
+      );
+
+      console.log(
+        `Arquivo a ser transmitido remontando com sucess no diretório: generatedFiles`
+      );
+    } catch (err) {
+      console.log(err);
+    }
   }
 }

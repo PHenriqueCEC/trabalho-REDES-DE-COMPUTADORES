@@ -4,6 +4,7 @@ import logger from "./utils/logger.js";
 import { PACKAGE_TYPE, PACKAGE_TYPE_DICTIONARY } from "./constants/index.js";
 import { breakFileIntoChunks } from "./utils/files.js";
 
+const MIN_WINDOW_SIZE = 5;
 export class SafeUdpServer {
   constructor({ bufferSize, port }) {
     this.buffer = Buffer.alloc(parseInt(bufferSize));
@@ -15,6 +16,8 @@ export class SafeUdpServer {
     this.bufferSize = bufferSize;
     this.timeouts = [];
     this.lostPackages = 0;
+    this.receivedPackages = 0;
+    this.doubledACKS = 0;
 
     //Janela deslizante
     this.confirmedPackages = [];
@@ -22,11 +25,11 @@ export class SafeUdpServer {
 
     this.windowSize = 10;
     this.baseSeqNum = 0;
-    this.lastRecevSeqNum = 0;
 
     this.sampleRTT = 200;
     this.estimatedRTT = 0;
     this.devRTT = 0;
+    this.totalRTT = 0;
 
     this.startRTT = [];
 
@@ -39,6 +42,8 @@ export class SafeUdpServer {
   initServer() {
     this.server = dgram.createSocket("udp4");
     this.server.bind(this.port);
+
+    this.receivedPackages++;
 
     this.onError();
     this.onMessage();
@@ -55,7 +60,7 @@ export class SafeUdpServer {
       (1 - beta) * this.devRTT +
       beta * Math.abs(this.sampleRTT - this.estimatedRTT);
 
-    return this.estimatedRTT + 4 * this.devRTT;
+    return 3 * (this.estimatedRTT + 4 * this.devRTT);
   }
 
   onListening() {
@@ -77,7 +82,7 @@ export class SafeUdpServer {
   getPackageType(data) {
     const packageType = data.readInt8();
 
-    return packageType === 1 ? "connection" : "data";
+    return PACKAGE_TYPE_DICTIONARY[packageType];
   }
 
   handleConnectionPackage(msg) {
@@ -88,11 +93,18 @@ export class SafeUdpServer {
     this.sendDataPackage(data, this.clientUrl);
   }
 
-  discconect() {
+  disconnect() {
     const data = Buffer.alloc(1);
     data.writeInt8(PACKAGE_TYPE.disconnection);
 
     this.server.send(data, this.clientUrl);
+
+    this.generateTransmissionResults();
+  }
+
+  generateTransmissionResults() {
+    console.log(`Timeout packages ${this.lostPackages}`);
+    console.log(`Doubled ACKS`, this.doubledACKS);
   }
 
   makeDataPackage(numberOfSequence) {
@@ -131,25 +143,32 @@ export class SafeUdpServer {
 
   handleDataPackage(msg) {
     const numberOfSequence = msg.readUint32BE(1);
-
     logger.info(`Package ${numberOfSequence} received`);
 
-    if (this.startRTT[numberOfSequence]) {
-      this.sampleRTT = new Date().getTime() - this.startRTT[numberOfSequence];
-    }
+    this.confirmPackage(numberOfSequence);
+
+    this.updateWindow(numberOfSequence);
+    this.runWindow();
+  }
+
+  confirmPackage(numberOfSequence) {
+    if (this.confirmPackage[numberOfSequence]) this.doubledACKS++;
 
     this.confirmedPackages[numberOfSequence] = true;
+
     clearTimeout(this.timeouts[numberOfSequence]);
+  }
+
+  updateWindow(numberOfSequence) {
+    this.windowSize++;
 
     if (numberOfSequence === this.baseSeqNum) this.baseSeqNum++;
 
     if (this.currentWindowIsConfirmed()) {
       this.baseSeqNum += this.windowSize;
 
-      if (this.baseSeqNum >= this.fileChunks.length) this.discconect();
+      if (this.baseSeqNum >= this.fileChunks.length) this.disconnect();
     }
-
-    this.runWindow();
   }
 
   runWindow() {
@@ -162,6 +181,17 @@ export class SafeUdpServer {
         const packageToSend = this.makeDataPackage(i);
         this.sendDataPackage(packageToSend, this.clientUrl, i);
       }
+    }
+  }
+
+  updateSampleRTT(numberOfSequence) {
+    if (this.startRTT[numberOfSequence]) {
+      const packageTimeout =
+        new Date().getTime() - this.startRTT[numberOfSequence];
+
+      this.totalRTT += packageTimeout;
+
+      this.sampleRTT = this.totalRTT / this.receivedPackages;
     }
   }
 
@@ -197,7 +227,7 @@ export class SafeUdpServer {
     this.server.on("error", (err) => {});
   }
 
-  sendFile(file, clientUrl) {
+  sendFile({ file, filename, clientUrl }) {
     this.clientUrl = clientUrl;
     this.fileChunks = breakFileIntoChunks(
       file,
@@ -205,7 +235,7 @@ export class SafeUdpServer {
     );
     this.baseSeqNum = 0;
 
-    this.handshake(this.fileChunks.length);
+    this.handshake(this.fileChunks.length, filename);
     this.initControlsArrays(this.fileChunks.length);
   }
 
@@ -233,7 +263,7 @@ export class SafeUdpServer {
         logger.warn(`Package ${numberOfSequence} got timeout`);
 
         this.lostPackages++;
-        //this.windowSize = this.windowSize / 2;
+        this.reduceWindowSize();
 
         this.sendDataPackage(packageData, clientUrl);
       }
@@ -242,13 +272,21 @@ export class SafeUdpServer {
     this.timeouts[numberOfSequence] = timeout;
   }
 
-  handshake(numberOfPackages) {
-    const data = Buffer.alloc(9);
+  reduceWindowSize() {
+    this.lostPackages++;
+    const newWindowSize = this.windowSize--;
+
+    if (newWindowSize >= MIN_WINDOW_SIZE) this.windowSize = newWindowSize;
+  }
+
+  handshake(numberOfPackages, filename) {
+    const data = Buffer.alloc(9 + Buffer.byteLength(filename, "utf-8"));
     const initialPackageSeqNum = 0;
 
     data.writeInt8(PACKAGE_TYPE.connection);
     data.writeInt32BE(numberOfPackages, 1);
     data.writeUint32BE(initialPackageSeqNum, 5);
+    data.write(filename, 9);
 
     this.server.send(data, this.clientUrl);
   }
