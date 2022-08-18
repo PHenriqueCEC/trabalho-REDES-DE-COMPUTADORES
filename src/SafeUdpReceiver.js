@@ -3,12 +3,12 @@ import fs from "fs";
 import logger from "./utils/logger.js";
 import path from "path";
 import { PACKAGE_TYPE, PACKAGE_TYPE_DICTIONARY } from "./constants/index.js";
-
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const INITIAL_WINDOW_SIZE = 10;
 
 export class SafeUdpReceiver {
   constructor({ serverUrl, port, serverPort }) {
@@ -75,13 +75,10 @@ export class SafeUdpReceiver {
     const initialPackageSeqNum = msg.readInt32BE(5);
     this.filename = msg.subarray(9).toString();
 
-    const initialWindowSize = 10;
-
     const data = Buffer.alloc(9);
-    //Escreve tipo de pacote
     data.writeInt8(PACKAGE_TYPE.connection);
     data.writeInt32BE(initialPackageSeqNum, 1);
-    data.writeUInt32BE(initialWindowSize, 5);
+    data.writeUInt32BE(INITIAL_WINDOW_SIZE, 5);
 
     this.server.send(data, this.serverPort);
   }

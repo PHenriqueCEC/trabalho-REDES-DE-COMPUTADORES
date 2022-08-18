@@ -18,6 +18,8 @@ export class SafeUdpServer {
     this.lostPackages = 0;
     this.receivedPackages = 0;
     this.doubledACKS = 0;
+    this.sentDataPackagesCounter = 0;
+    this.startTransmissionTime = 0;
 
     //Janela deslizante
     this.confirmedPackages = [];
@@ -37,13 +39,15 @@ export class SafeUdpServer {
     this.cwnd = 0;
 
     this.initServer();
+
+    this.printInfoInterval = setInterval(() => {
+      this.generateTransmissioninfo();
+    }, 500);
   }
 
   initServer() {
     this.server = dgram.createSocket("udp4");
     this.server.bind(this.port);
-
-    this.receivedPackages++;
 
     this.onError();
     this.onMessage();
@@ -73,6 +77,7 @@ export class SafeUdpServer {
   onMessage() {
     this.server.on("message", (msg, rinfo) => {
       const packageType = this.getPackageType(msg);
+      this.receivedPackages++;
 
       if (packageType === "connection") this.handleConnectionPackage(msg);
       else this.handleDataPackage(msg);
@@ -99,12 +104,24 @@ export class SafeUdpServer {
 
     this.server.send(data, this.clientUrl);
 
-    this.generateTransmissionResults();
+    this.generateTransmissioninfo();
+    clearInterval(this.printInfoInterval);
   }
 
-  generateTransmissionResults() {
-    console.log(`Timeout packages ${this.lostPackages}`);
+  generateTransmissioninfo() {
+    const elapsedTime = new Date().getTime() - this.startTransmissionTime;
+
+    console.log("---------------------------------------------");
+    console.log(`Transmition Info`);
+    console.log("---------------------------------------------");
+    console.log(`Lost packages ${this.lostPackages}`);
     console.log(`Doubled ACKS`, this.doubledACKS);
+    console.log(`Received packages : ${this.receivedPackages}`);
+    console.log(`Sent Packages: ${this.sentDataPackagesCounter}`);
+    console.log(`Elapsed time: ${elapsedTime} ms`);
+    console.log(`Window size: ${this.windowSize}`);
+
+    console.log("---------------------------------------------");
   }
 
   makeDataPackage(numberOfSequence) {
@@ -288,6 +305,7 @@ export class SafeUdpServer {
     data.writeUint32BE(initialPackageSeqNum, 5);
     data.write(filename, 9);
 
+    this.startTransmissionTime = new Date().getTime();
     this.server.send(data, this.clientUrl);
   }
 
@@ -303,6 +321,7 @@ export class SafeUdpServer {
 
     this.sentPackages[numberOfSequence] = true;
 
+    this.sentDataPackagesCounter++;
     logger.info(`${numberOfSequence} enviado`);
   }
 }
