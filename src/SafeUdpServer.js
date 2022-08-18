@@ -5,6 +5,8 @@ import { PACKAGE_TYPE, PACKAGE_TYPE_DICTIONARY } from "./constants/index.js";
 import { breakFileIntoChunks } from "./utils/files.js";
 
 const MIN_WINDOW_SIZE = 5;
+const MAX_WINDOW_SIZE = 800;
+
 export class SafeUdpServer {
   constructor({ bufferSize, port }) {
     this.buffer = Buffer.alloc(parseInt(bufferSize));
@@ -17,6 +19,8 @@ export class SafeUdpServer {
     this.timeouts = [];
     this.lostPackages = 0;
     this.receivedPackages = 0;
+    this.ackedPackagesCount = 0;
+
     this.doubledACKS = 0;
     this.sentDataPackagesCounter = 0;
     this.startTransmissionTime = 0;
@@ -34,9 +38,6 @@ export class SafeUdpServer {
     this.totalRTT = 0;
 
     this.startRTT = [];
-
-    this.sstresh = 0;
-    this.cwnd = 0;
 
     this.initServer();
 
@@ -120,6 +121,7 @@ export class SafeUdpServer {
     console.log(`Sent Packages: ${this.sentDataPackagesCounter}`);
     console.log(`Elapsed time: ${elapsedTime} ms`);
     console.log(`Window size: ${this.windowSize}`);
+    console.log(`Acked packages: ${this.ackedPackagesCount}`);
 
     console.log("---------------------------------------------");
   }
@@ -164,28 +166,28 @@ export class SafeUdpServer {
 
     this.confirmPackage(numberOfSequence);
 
-    this.updateWindow(numberOfSequence);
+    if (this.ackedPackagesCount === this.fileChunks.length) this.disconnect();
+
+    this.increaseWindow(numberOfSequence);
+
     this.runWindow();
   }
 
   confirmPackage(numberOfSequence) {
     if (this.confirmPackage[numberOfSequence]) this.doubledACKS++;
+    else this.ackedPackagesCount++;
 
     this.confirmedPackages[numberOfSequence] = true;
 
     clearTimeout(this.timeouts[numberOfSequence]);
   }
 
-  updateWindow(numberOfSequence) {
+  increaseWindow(numberOfSequence) {
     this.windowSize++;
 
     if (numberOfSequence === this.baseSeqNum) this.baseSeqNum++;
-
-    if (this.currentWindowIsConfirmed()) {
+    else if (this.currentWindowIsConfirmed())
       this.baseSeqNum += this.windowSize;
-
-      if (this.baseSeqNum >= this.fileChunks.length) this.disconnect();
-    }
   }
 
   runWindow() {
@@ -280,8 +282,8 @@ export class SafeUdpServer {
         logger.warn(`Package ${numberOfSequence} got timeout`);
 
         this.lostPackages++;
-        this.reduceWindowSize();
 
+        this.reduceWindowSize();
         this.sendDataPackage(packageData, clientUrl);
       }
     }, time);
@@ -290,7 +292,6 @@ export class SafeUdpServer {
   }
 
   reduceWindowSize() {
-    this.lostPackages++;
     const newWindowSize = this.windowSize--;
 
     if (newWindowSize >= MIN_WINDOW_SIZE) this.windowSize = newWindowSize;

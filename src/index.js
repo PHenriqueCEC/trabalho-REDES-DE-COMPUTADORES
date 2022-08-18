@@ -26,6 +26,6 @@ const image = fs.readFileSync(filePath);
 
 server.sendFile({
   file: image,
-  filename: "10MBImage.jpg",
+  filename,
   clientUrl: CLIENT_PORT,
 });
