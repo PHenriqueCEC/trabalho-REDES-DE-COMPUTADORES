@@ -50,8 +50,6 @@ export class SafeUdpReceiver {
 
   initOnMessage() {
     this.server.on("message", (msg) => {
-      logger.info(`Server got a message with legnth of: ${msg.length}`);
-
       const packageType = this.getPackageType(msg);
 
       if (packageType === "connection") this.handleConnectionPackage(msg);

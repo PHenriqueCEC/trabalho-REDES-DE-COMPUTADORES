@@ -6,6 +6,7 @@ import { SafeUdpReceiver } from "./SafeUdpReceiver.js";
 import readFilename from "./utils/readFilename.js";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
+import { exit } from "process";
 
 const __filename = fileURLToPath(import.meta.url);
 export const __dirname = dirname(__filename);
@@ -22,10 +23,15 @@ new SafeUdpReceiver({
   serverPort: PORT,
 });
 
-const image = fs.readFileSync(filePath);
+try {
+  const image = fs.readFileSync(filePath);
 
-server.sendFile({
-  file: image,
-  filename,
-  clientUrl: CLIENT_PORT,
-});
+  server.sendFile({
+    file: image,
+    filename,
+    clientUrl: CLIENT_PORT,
+  });
+} catch (err) {
+  console.log("Arquivo não encontrado");
+  exit(0);
+}

@@ -149,10 +149,6 @@ export class SafeUdpServer {
     const initialPackageSeqNum = msg.readUInt32BE(1);
     this.windowSize = msg.readUint32BE(5);
 
-    logger.info(
-      `Initial seq num ${initialPackageSeqNum}, initial Window Size ${this.windowSize}`
-    );
-
     const data = this.makeDataPackage(initialPackageSeqNum);
 
     this.sendDataPackage(data, this.clientUrl);
@@ -162,7 +158,6 @@ export class SafeUdpServer {
 
   handleDataPackage(msg) {
     const numberOfSequence = msg.readUint32BE(1);
-    logger.info(`Package ${numberOfSequence} received`);
 
     this.confirmPackage(numberOfSequence);
 
@@ -323,6 +318,5 @@ export class SafeUdpServer {
     this.sentPackages[numberOfSequence] = true;
 
     this.sentDataPackagesCounter++;
-    logger.info(`${numberOfSequence} enviado`);
   }
 }
