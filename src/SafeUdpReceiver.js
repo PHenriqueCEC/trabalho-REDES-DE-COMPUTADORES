@@ -25,7 +25,7 @@ export class SafeUdpReceiver {
   }
 
   acceptPackage() {
-    return parseInt(Math.random() * 1000) > 2;
+    return parseInt(Math.random() * 1000) > 100;
   }
 
   /*@todo: controle de fluxo*/
@@ -117,7 +117,7 @@ export class SafeUdpReceiver {
       );
 
       console.log(
-        `Arquivo a ser transmitido remontando com sucess no diretório: generatedFiles`
+        `Arquivo a ser transmitido remontando com sucess no diretório: generatedFiles/${this.filename}`
       );
     } catch (err) {
       console.log(err);
